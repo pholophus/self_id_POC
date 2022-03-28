@@ -15,6 +15,8 @@ export default function EquipmentsList({ active, did }: Props) {
   const equipmentsRecord = useEquipmentsRecord(did)
 
   const profile = getProfileInfo(did, profileRecord.content)
+
+  console.log(profile);
   const avatar = profile.avatarSrc ? (
     <Avatar size="32px" src={profile.avatarSrc} flex={false} />
   ) : (

@@ -7,15 +7,30 @@ import {
   usePublicRecord,
   useViewerID,
   useViewerRecord,
+  uploadImage
 } from '@self.id/framework'
-import type { PublicRecord } from '@self.id/framework'
+import type { PublicRecord, SelfID, Dimensions, ImageSources } from '@self.id/framework'
 import { useAtom } from 'jotai'
 import { useResetAtom } from 'jotai/utils'
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useRef} from 'react'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
-
+import toast from 'react-hot-toast'
 import { draftNoteAtom, draftEquipemtAtom, editionStateAtom } from './state'
 import type { EditionState, ModelTypes, Note, Notes, Equipments, Equipment } from './types'
+import type { BasicProfile } from '@datamodels/identity-profile-basic'
+import type { ChangeEvent } from 'react'
+
+import { IPFS_API_URL } from '../src/constants'
+
+const UPLOAD_MAX_SIZE = 2500000
+
+export type UploadState = 'idle' | 'uploading' | 'failed' | 'done'
+
+
+export type ImageUploadOptions = {
+  dimensions?: Array<Dimensions>
+  maxSize?: number
+}
 
 export type TileDoc<ContentType> = {
   isLoading: boolean
@@ -82,6 +97,10 @@ export function useNotesRecord(did: string): PublicRecord<Notes | null> {
 
 export function useEquipmentsRecord(did: string): PublicRecord<Equipments | null> {
   return usePublicRecord<ModelTypes, 'equipments'>('equipments', did)
+}
+
+export function useViewerProfile(): PublicRecord<BasicProfile | null> {
+  return useViewerRecord('basicProfile')
 }
 
 // for receiving data from form
@@ -349,3 +368,104 @@ export function useEquipment(did: string, id: string) {
     update,
   }
 }
+
+
+export function useLogin(): (switchAccount?: boolean) => Promise<SelfID | null> {
+  const connect = useConnection()[1]
+  return useCallback(
+    async (switchAccount?: boolean): Promise<SelfID | null> => {
+      return await connect({ switchAccount })
+    },
+    [connect]
+  )
+}
+
+export function useLogout() {
+  return useConnection()[2]
+}
+
+export function useEditProfile(): [boolean, (profile: BasicProfile) => Promise<void>] {
+  const profileRecord = useViewerRecord('basicProfile')
+
+  const editProfile = useCallback(
+    async (profile: BasicProfile) => {
+      if (!profileRecord.isMutable || profileRecord.isMutating) {
+        return
+      }
+
+      try {
+        await toast.promise(profileRecord.set(profile), {
+          loading: 'Saving profile...',
+          success: 'Profile successfully saved!',
+          error: 'Failed to save profile',
+        })
+      } catch (error) {
+        console.warn('Failed to save profile', error)
+      }
+    },
+    [profileRecord]
+  )
+
+  return [profileRecord.isMutating, editProfile]
+}
+
+// export function useImageUpload(
+//   onUpload: (sources: ImageSources) => void,
+//   options: ImageUploadOptions = {}
+// ) {
+//   const maxSize = options.maxSize ?? UPLOAD_MAX_SIZE
+//   const [state, setState] = useState<UploadState>('idle')
+//   const sourcesRef = useRef<ImageSources | null>(null)
+//   const inputRef = useRef<HTMLInputElement>(null)
+
+//   function resetInput() {
+//     if (inputRef.current != null) {
+//       inputRef.current.value = ''
+//     }
+//   }
+
+//   const trigger = useCallback(() => {
+//     inputRef.current?.click()
+//   }, [])
+
+//   const onChange = useCallback(
+//     (e: ChangeEvent<HTMLInputElement>) => {
+//       sourcesRef.current = null
+
+//       const file = e.target?.files?.[0]
+//       if (file == null || file.size > maxSize) {
+//         toast.error('Selected image exceeds maximum allowed size')
+//         resetInput()
+//         return
+//       }
+
+//       setState('uploading')
+
+//       uploadImage(IPFS_API_URL, file, options.dimensions).then(
+//         (imageSources) => {
+//           resetInput()
+//           sourcesRef.current = imageSources
+//           onUpload(imageSources)
+//           setState('done')
+//         },
+//         (err) => {
+//           console.warn('Failed to upload image to IPFS', err)
+//           setState('failed')
+//         }
+//       )
+//     },
+//     [maxSize, options.dimensions, onUpload]
+//   )
+
+//   const input = (
+//     <input
+//       accept="image/png, image/jpeg"
+//       onChange={onChange}
+//       ref={inputRef}
+//       style={{ display: 'none' }}
+//       type="file"
+//     />
+//   )
+
+//   return { input, state, trigger, value: sourcesRef.current }
+// }

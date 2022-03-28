@@ -8,6 +8,7 @@ export type EditionState =
   | { status: 'done'; notePage: string }
   | { status: 'done'; equipmentPage: string }
 
+
 export type NoteForm = {
   text: string
   title: string

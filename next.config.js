@@ -8,4 +8,7 @@ module.exports = {
     styledComponents: true,
   },
   reactStrictMode: true,
+  images: {
+    domains: ['ipfs.infura.io']
+  }
 }

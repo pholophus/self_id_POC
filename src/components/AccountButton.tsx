@@ -1,15 +1,51 @@
 import { AvatarPlaceholder, useConnection, useViewerID, useViewerRecord } from '@self.id/framework'
-import { Avatar, Box, Button, DropButton, Text } from 'grommet'
+import { Avatar, Box, Button, DropButton, Text, Spinner } from 'grommet'
 import Link from 'next/link'
-import { useState } from 'react'
+import { forwardRef, useCallback, useMemo, useState } from 'react'
 
 import { getProfileInfo } from '../utils'
+// import { formatDID, getImageURL } from '../utils'
 
-import DisplayAvatar from './DisplayAvatar'
 import { profile } from 'console'
+import { useRouter } from 'next/router'
+
+type DisplayAvatarProps = {
+  did?: string
+  label: string
+  loading?: boolean
+  src?: string | null
+}
+
+function DisplayAvatar({ did, label, loading, src }: DisplayAvatarProps) {
+  const avatar = loading ? (
+    <Box pad="xxsmall">
+      <Spinner />
+    </Box>
+  ) : src ? (
+    <Avatar size="32px" src={src} flex={false} />
+  ) : (
+    <AvatarPlaceholder did={did} size={32} />
+  )
+
+  return (
+    <Box
+      border={{ color: 'neutral-5' }}
+      direction="row"
+      gap="small"
+      pad="xxsmall"
+      round="large"
+      width="250px">
+      {avatar}
+      <Text alignSelf="center" size="medium" truncate weight="bold">
+        {label}
+      </Text>
+    </Box>
+  )
+}
 
 type MenuButtonProps = {
   label: string
+  loading?: boolean
   onClick: () => void
 }
 
@@ -31,13 +67,34 @@ function MenuButton({ label, ...props }: MenuButtonProps) {
 }
 
 export default function AccountButton() {
+  const router = useRouter()
   const [connection, connect, disconnect] = useConnection()
   const viewerID = useViewerID()
   const profileRecord = useViewerRecord('basicProfile')
   const [isMenuOpen, setMenuOpen] = useState(false)
+  const [isLoadingProfile, setLoadingProfile] = useState(false)
 
   console.log('profile')
-  console.log(profileRecord)
+  console.log(profileRecord.content)
+
+  const toProfile = useCallback(
+    (id: string | null) => {
+      if (id != null) {
+        if (router.route === '/[id]' && router.query.id === id) {
+          // Already on wanted profile page
+          setMenuOpen(false)
+        } else {
+          // Navigate to profile page
+          setLoadingProfile(true)
+          void router.push(`/${id}`).then(() => {
+            setMenuOpen(false)
+            setLoadingProfile(false)
+          })
+        }
+      }
+    },
+    [router]
+  )
 
   if (viewerID != null) {
     const { avatarSrc, displayName } = getProfileInfo(viewerID.id, profileRecord.content)
@@ -45,11 +102,23 @@ export default function AccountButton() {
     const buttons =
       connection.status === 'connected' ? (
         <>
-          <MenuButton label="Profile" onClick={() => disconnect()} />
+          <MenuButton
+            label="Profile"
+            loading={isLoadingProfile}
+            onClick={() => toProfile(viewerID.id)}
+          />
+          <Link href="/me/profile/edit" passHref>
+            <Button primary color="black" label="Edit" style={{ border: 0, color: 'white' }} />
+          </Link>
           <MenuButton label="Disconnect" onClick={() => disconnect()} />
         </>
       ) : (
         <>
+           <MenuButton
+            label="Profile"
+            loading={isLoadingProfile}
+            onClick={() => toProfile(viewerID.id)}
+          />
           <MenuButton
             label="Connect"
             onClick={() => {
